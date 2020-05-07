@@ -3,6 +3,7 @@ local mqtt = require "mosquitto"
 local lfs = require "lfs"
 local cqueues = require "cqueues"
 local notify = require "cqueues.notify"
+local os = require "os"
 
 local cfg = {}
 if io.open("lua4mqtt.config") then
@@ -17,18 +18,63 @@ local mq = mqtt.new(ifname, true)
 local nfy = notify.opendir("rules")
 
 local rules = {}
+local timers = {}
 local status = {}
 
 local function err_handler(err)
 	print(debug.traceback(err))
 end
 
+Timer = {_timers = {}}
+	function Timer:new(o)
+		o = o or {}
+		self.__index = self
+		setmetatable(o, self)
+		return o
+	end
+	function Timer:add(time, func, rep)
+		print("scheduling timer at " .. os.date("%c", time) .. " with repeat interval of " .. tostring(rep))
+		if not self._timers[time] then self._timers[time] = {} end
+		self._timers[time][func] = rep
+	end
+	function Timer:every(time, func)
+		self:add(os.time() + time, func, time)
+	end
+	function Timer:after(time, func)
+		self:add(os.time() + time, func, 0)
+	end
+	function Timer:at(time, func)
+		self:add(time, func, 0)
+	end
+	function Timer:atevery(first, rep, func)
+		self:add(first, func, rep)
+	end
+	function Timer:clear(func)
+		for _, time in pairs(self._timers) do
+			time[func] = nil
+		end
+	end
+	function Timer:fire()
+		local calltime = os.time()
+		for time in pairs(self._timers) do
+			if time <= calltime then
+				for func, rep in pairs(self._timers[time]) do
+					xpcall(func, err_handler)
+					self:add(time + rep, func, rep)
+				end
+				self._timers[time] = nil
+			end
+		end
+	end
+
+
 local function reload(file)
 	local r = {}
 	print("loading " .. file)
 	local f, err = loadfile("rules/" .. file)
 	if f then
-		local ok, res = xpcall(f, err_handler, mq, status)
+		timers[file] = Timer:new()
+		local ok, res = xpcall(f, err_handler, mq, status, timers[file])
 		if ok and res then
 			for k, v in pairs(res) do
 				r[k] = v
@@ -56,6 +102,7 @@ local function scan()
 	for file, _ in pairs(rules) do
 		if not existing[file] then
 			print("unloading " .. file)
+			timers[file] = nil
 			rules[file] = nil
 		end
 	end
@@ -83,17 +130,18 @@ end
 scan()
 mq:will_set(ifname .. "/connected", 0, 2, true)
 mq:connect(broker)
+local mq_fd = mq:socket()
 
 local cq = cqueues.new()
 
-cq:wrap(function()
+cq:wrap(function() -- MQTT loop
 	while true do
-		cqueues.poll({pollfd = mq:socket(), events = "r", timeout = 1})
+		cqueues.poll({pollfd = mq_fd, events = "r"})
 		mq:loop()
 	end
 end)
 
-cq:wrap(function()
+cq:wrap(function() -- rules configuration loop
 	while true do
 		for flags, file in nfy:changes() do
 			if file == "." then
@@ -101,6 +149,15 @@ cq:wrap(function()
 			else
 				reload(file)
 			end
+		end
+	end
+end)
+
+cq:wrap(function() -- timer loop
+	while true do
+		cqueues.poll(1)
+		for _, timer in pairs(timers) do
+			timer:fire()
 		end
 	end
 end)
