@@ -136,7 +136,7 @@ local cq = cqueues.new()
 
 cq:wrap(function() -- MQTT loop
 	while true do
-		cqueues.poll({pollfd = mq_fd, events = "r"})
+		cqueues.poll({pollfd = mq_fd, events = "r", timeout=0.1})
 		mq:loop()
 	end
 end)
