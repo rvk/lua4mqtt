@@ -77,10 +77,16 @@ Timer = {_timers = {}}
 local function reload(file)
 	local r = {}
 	print("loading " .. file)
-	local f, err = loadfile("rules/" .. file)
+	local timer = Timer:new()
+	local env = {}
+	env.s = status
+	env.mq = mq
+	env.timer = timer
+	setmetatable(env, {__index = _G})
+	local f, err = loadfile("rules/" .. file, "t", env)
 	if f then
-		timers[file] = Timer:new()
-		local ok, res = xpcall(f, err_handler, mq, status, timers[file])
+		timers[file] = timer
+		local ok, res = xpcall(f, err_handler)
 		if ok and res then
 			for k, v in pairs(res) do
 				r[k] = v
