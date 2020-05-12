@@ -13,6 +13,12 @@ end
 
 local ifname = cfg.ifname or "logic"
 local broker = cfg.broker or "localhost"
+local topics = {ifname .. "/#", "+/status/#", "+/connected"}
+if (cfg.additional_topics) then
+	for _, v in pairs(cfg.additional_topics) do
+		table.insert(topics, v)
+	end
+end
 
 local mq = mqtt.new(ifname, true)
 local nfy = notify.opendir("rules")
@@ -110,8 +116,10 @@ end
 
 mq.ON_CONNECT = function()
         print("connected to " .. broker)
-	mq:subscribe("+/status/#")
-	mq:subscribe("+/connected")
+	for _, v in pairs(topics) do
+		print("subscribing to " .. v)
+		mq:subscribe(v)
+	end
 	mq:publish(ifname .. "/connected", 2, 2, true)
 end
 
