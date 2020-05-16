@@ -31,11 +31,12 @@ local function err_handler(err)
 	print(debug.traceback(err))
 end
 
-Timer = {_timers = {}}
+Timer = {}
 	function Timer:new(o)
 		o = o or {}
 		self.__index = self
 		setmetatable(o, self)
+		o._timers = {}
 		return o
 	end
 	function Timer:add(time, func, rep)
@@ -83,9 +84,9 @@ local function reload(file)
 	env.mq = mq
 	env.timer = timer
 	setmetatable(env, {__index = _G})
+	timers[file] = timer
 	local f, err = loadfile("rules/" .. file, "t", env)
 	if f then
-		timers[file] = timer
 		local ok, res = xpcall(f, err_handler)
 		if ok and res then
 			for k, v in pairs(res) do
