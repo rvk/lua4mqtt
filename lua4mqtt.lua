@@ -68,8 +68,12 @@ Timer = {}
 		self:add(first, func, rep)
 	end
 	function Timer:clear(func)
+		assert(type(func) == "function", "parameter must be function")
 		for _, time in pairs(self._timers) do
-			time[func] = nil
+			if time[func] then
+				print("clearing timer at " .. os.date("%c", _))
+				time[func] = nil
+			end
 		end
 	end
 	function Timer:fire()
@@ -77,8 +81,8 @@ Timer = {}
 		for time in pairs(self._timers) do
 			if time <= calltime then
 				for func, rep in pairs(self._timers[time]) do
-					xpcall(func, err_handler)
 					self:add(time + rep, func, rep)
+					xpcall(func, err_handler)
 				end
 				self._timers[time] = nil
 			end
