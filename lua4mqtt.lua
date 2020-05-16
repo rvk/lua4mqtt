@@ -40,6 +40,17 @@ Timer = {}
 		return o
 	end
 	function Timer:add(time, func, rep)
+		local calltime = os.time()
+		if (time < calltime) then
+			if rep < 1 then
+				print("time is in the past and event is not recurring. not scheduling at " .. os.date("%c", time))
+				return
+			end
+			local diff = ((calltime - time) // rep + 1) * rep
+			local newtime = time + diff
+			print("time " .. os.date("%c", time) .. " is in the past, adjusting to " .. os.date("%c", time + diff))
+			time = newtime
+		end
 		print("scheduling timer at " .. os.date("%c", time) .. " with repeat interval of " .. tostring(rep))
 		if not self._timers[time] then self._timers[time] = {} end
 		self._timers[time][func] = rep
