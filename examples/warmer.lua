@@ -28,13 +28,15 @@ local min_delay = 10 -- min delay between changes in seconds
 
 r = {}
 
+local current = 333 -- 3000K, kludgy default after startup
+
 local function between(x, a, b)
 	return a < x and x < b or b < x and x < a
 end
 
 local function progress(from, to, transition_time)
 	local difference = to - from
-	local current = from
+	current = from
 	print("going from",from,"to",to,". difference is",difference, "and transition time is", transition_time)
 	local steps = math.ceil(math.abs(difference) / min_step)
 	if transition_time < math.abs(difference) / min_step * min_delay then
@@ -67,7 +69,11 @@ timer:atevery(os.time(start_cooling), 60 * 60 * 24, function()
 	progress(warm, cool, os.time(end_cooling) - os.time(start_cooling))
 end)
 
-r["logic/set/warmer"] = function()
+r["hue/status/lights/+/reachable"] = function(event, topic)
+	if event == "true" then
+		local light = string.gsub(topic, "hue/status/lights/([^/]+).*","%1")
+		mq:publish("hue/set/lights/" .. light .. "/ct", current)
+	end
 end
 
 return r
