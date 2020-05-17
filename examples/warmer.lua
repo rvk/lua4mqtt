@@ -72,7 +72,7 @@ end)
 r["hue/status/lights/+/reachable"] = function(event, topic)
 	if event == "true" then
 		local light = string.gsub(topic, "hue/status/lights/([^/]+).*","%1")
-		mq:publish("hue/set/lights/" .. light .. "/ct", current)
+		mq:publish("hue/set/lights/" .. light .. "/ct", tostring(math.floor(current)))
 	end
 end
 
