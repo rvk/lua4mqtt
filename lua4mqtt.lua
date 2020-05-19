@@ -171,7 +171,7 @@ mq.ON_MESSAGE = function(mid, topic, payload)
 		for sub, func in pairs(ruleset) do
 			if mqtt.topic_matches_sub(sub, topic) then
 				local ok, res = xpcall(func, err_handler, payload, topic)
-				if not ok or not res then
+				if ok and res then
 					parse = false
 				end
 			end
