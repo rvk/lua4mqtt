@@ -6,16 +6,20 @@ r = {}
 
 r["domoticz/out"] = function(val)
 	local t = json.decode(val)
-	local o = s.logic.domoticz and s.logic.domoticz[tostring(t.idx)]
+	if not s.logic.domoticz then s.logic.domoticz = {} end
+	local o = s.logic.domoticz[tostring(t.idx)]
+	if not o then s.logic.domoticz[tostring(t.idx)] = {} end
 	for k, v in pairs(t) do
 		local function pub(k, v, o, parents)
 			local parents = {table.unpack(parents)}
 			if type(v) == "table" then
 				table.insert(parents, k)
 				for l, w in pairs(v) do
-					pub(l, w, o and o[k], parents)
+					if o[k] == nil then o[k] = {} end
+					pub(l, w, o[k], parents)
 				end
 			elseif not o or tostring(o[k]) ~= tostring(v) then
+				o[k] = v
 				table.insert(parents, "")
 				mq:publish("logic/status/domoticz/" .. t.idx .. "/" .. table.concat(parents, "/") .. k, v)
 			end
