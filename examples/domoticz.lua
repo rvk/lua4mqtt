@@ -7,8 +7,10 @@ r = {}
 r["domoticz/out"] = function(val)
 	local t = json.decode(val)
 	if not s.logic.domoticz then s.logic.domoticz = {} end
+	if not s.logic.domoticz[tostring(t.idx)] then
+		s.logic.domoticz[tostring(t.idx)] = {}
+	end
 	local o = s.logic.domoticz[tostring(t.idx)]
-	if not o then s.logic.domoticz[tostring(t.idx)] = {} end
 	for k, v in pairs(t) do
 		local function pub(k, v, o, parents)
 			local parents = {table.unpack(parents)}
@@ -19,7 +21,6 @@ r["domoticz/out"] = function(val)
 					pub(l, w, o[k], parents)
 				end
 			elseif not o or tostring(o[k]) ~= tostring(v) then
-				o[k] = v
 				table.insert(parents, "")
 				mq:publish("logic/status/domoticz/" .. t.idx .. "/" .. table.concat(parents, "/") .. k, v)
 			end
@@ -57,6 +58,13 @@ r["logic/set/domoticz/#"] = function(val, topic)
 			end
 			svalues[svalue_idx] = val
 			o["svalue" .. svalue_idx] = val
+		elseif string.find(name,"^Color/") then
+			t.command = "setcolbrightnessvalue"
+			t.color = {}
+			for k, v in pairs(o.Color) do
+				t.color[k] = tonumber(v)
+			end
+			t.color[string.sub(name, 7)] = tonumber(val)
 		end
 		t.svalue = table.concat(svalues, ";")
 	end)
