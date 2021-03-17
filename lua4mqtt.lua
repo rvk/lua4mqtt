@@ -13,7 +13,7 @@ end
 
 local ifname = cfg.ifname or "logic"
 local broker = cfg.broker or "localhost"
-local topics = {ifname .. "/#", "+/status/#", "+/connected"}
+local topics = {ifname .. "/#", "+/connected"}
 if (cfg.additional_topics) then
 	for _, v in pairs(cfg.additional_topics) do
 		table.insert(topics, v)
@@ -25,8 +25,7 @@ local nfy = notify.opendir("rules")
 
 local rules = {}
 local timers = {}
-local status = {}
-status.str = {}
+local msgs = {}
 
 local function err_handler(err)
 	print(debug.traceback(err))
@@ -96,7 +95,7 @@ local function reload(file)
 	print("loading " .. file)
 	local timer = Timer:new()
 	local env = {}
-	env.s = status
+	env.m = msgs
 	env.mq = mq
 	env.timer = timer
 	setmetatable(env, {__index = _G})
@@ -137,23 +136,6 @@ local function scan()
 	end
 end
 
-local function parse_status(topic, payload, idx, node)
-	topic = string.gsub(topic, "^([^/]+/)status/", "%1")
-	idx = idx or 1
-	node = node or status
-	local separator = string.find(topic, "/", idx)
-	if separator then
-		local token = string.sub(topic, idx, separator - 1)
-		if not node[token] then
-			node[token] = {}
-		end
-		parse_status(topic, payload, separator + 1, node[token])
-	else
-		local token = string.sub(topic, idx, -1)
-		node[token] = payload
-	end
-end
-
 mq.ON_CONNECT = function()
         print("connected to " .. broker)
 	for _, v in pairs(topics) do
@@ -165,19 +147,14 @@ end
 
 mq.ON_MESSAGE = function(mid, topic, payload)
 	print("received from " .. topic, payload)
-	status.str[topic] = payload
-	local parse = true
+	msgs[topic] = payload
 	for _, ruleset in pairs(rules) do
 		for sub, func in pairs(ruleset) do
 			if mqtt.topic_matches_sub(sub, topic) then
-				local ok, res = xpcall(func, err_handler, payload, topic)
-				if ok and res then
-					parse = false
-				end
+				xpcall(func, err_handler, payload, topic)
 			end
 		end
 	end
-	if parse then parse_status(topic, payload) end
 end
 
 scan()
